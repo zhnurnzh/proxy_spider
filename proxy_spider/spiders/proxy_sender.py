@@ -1,7 +1,9 @@
 import os
 import json
 import scrapy
-import time
+import time 
+from scrapy import signals
+from pydispatch import dispatcher
 
 class SequentialProxySpider(scrapy.Spider):
     name = "proxy_sender"
@@ -24,8 +26,10 @@ class SequentialProxySpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.start_time = time.time()  
         self.results_path = os.path.join(os.getcwd(), "results.json")
-        self.batches = []
+        self.batches = [] 
+        dispatcher.connect(self.spider_closed, signals.spider_closed)
 
     def _load_proxies(self):
         with open("proxies.json") as f:
@@ -167,3 +171,13 @@ class SequentialProxySpider(scrapy.Spider):
                 json.dump(results, f, indent=4)
         except Exception as e:
             self.logger.error(f"Error saving results: {e}")
+    def spider_closed(self, spider):
+        """Called when the spider finishes: compute elapsed and write time.txt"""
+        elapsed = time.time() - self.start_time
+        # break into hours, minutes, seconds
+        hours, rem = divmod(int(elapsed), 3600)
+        minutes, seconds = divmod(rem, 60)
+        timestr = f"{hours:02d}.{minutes:02d}.{seconds:02d}"
+        with open("time.txt", "w") as f:
+            f.write(timestr)
+        self.logger.info(f"Total run time: {timestr} (hh.mm.ss)")
